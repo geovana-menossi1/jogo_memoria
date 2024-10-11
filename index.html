@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo da Memória</title>
+    <style>
+        /* Estilo mantido */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        #game-container {
+            display: grid;
+            grid-template-columns: repeat(5, 100px); /* Ajustar para diferentes números de cartas */
+            grid-gap: 10px;
+        }
+
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #fff;
+            border: 2px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .card.flipped {
+            background-color: #76c7c0;
+            cursor: default;
+        }
+
+        #select-mode {
+            width: 40%;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        #difficulty {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        /* Estilização do select */
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 2px solid #333;
+            outline: none;
+            cursor: pointer;
+            margin-right: 50px;
+        }
+
+        /* Jogadores diferentes */
+        .player1 {
+            border: 3px solid #ff6f61;
+        }
+
+        .player2 {
+            border: 3px solid #6a5acd;
+        }
+
+        /* Estilo dos ícones */
+        .fas {
+            color: #333;
+        }
+
+        /* Estilo do contador de erros */
+        #error-counter {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <h1>Jogo da Memória</h1>
+
+    <div id="select-mode">
+        <label for="mode">Selecione o Modo: </label>
+        <select id="mode">
+            <option value="solo">Solo</option>
+            <option value="duo">Dupla</option>
+        </select>
+        <label for="level">Nível de Dificuldade: </label>
+        <select id="level">
+            <option value="easy">Fácil</option>
+            <option value="medium">Médio</option>
+            <option value="hard">Difícil</option>
+        </select>
+    </div>
+
+    <div id="game-container">
+        <!-- Cartas do Jogo -->
+    </div>
+
+    <div id="error-counter">Erros: 0</div>
+
+    <script>
+        const allIcons = [
+            'fa-car', 'fa-bicycle', 'fa-bus', 'fa-motorcycle',
+            'fa-plane', 'fa-ship', 'fa-subway', 'fa-train',
+            'fa-truck', 'fa-helicopter', 'fa-rocket', 'fa-space-shuttle',
+            'fa-ambulance', 'fa-fire-truck', 'fa-taxi', 'fa-tractor'
+        ];
+
+        let gameMode = 'solo';
+        let difficultyLevel = 'easy';
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let playerTurn = 1;
+        let scores = { player1: 0, player2: 0 };
+        let errorCount = 0;  // Adicionando variável para o contador de erros
+
+        const gameContainer = document.getElementById('game-container');
+        const modeSelect = document.getElementById('mode');
+        const difficultySelect = document.getElementById('level');
+        const difficultyDiv = document.getElementById('difficulty');
+        const errorCounter = document.getElementById('error-counter');  // Elemento de exibição de erros
+
+        modeSelect.addEventListener('change', (e) => {
+            gameMode = e.target.value;
+            difficultyDiv.style.display = gameMode === 'solo' ? 'block' : 'none';
+            resetGame();
+        });
+
+        difficultySelect.addEventListener('change', (e) => {
+            difficultyLevel = e.target.value;
+            resetGame();
+        });
+
+        function createBoard() {
+            const cards = [];
+            const iconCount = getIconCount();
+
+            for (let i = 0; i < iconCount; i++) {
+                const icon = allIcons[i];
+                cards.push(createCard(icon));
+                cards.push(createCard(icon));
+            }
+
+            if (difficultyLevel === 'easy' || difficultyLevel === 'hard') {
+                cards.push(createCard(allIcons[iconCount]));
+            }
+
+            shuffle(cards);
+            cards.forEach(card => gameContainer.appendChild(card));
+            adjustGridLayout(cards.length);
+        }
+
+        function getIconCount() {
+            if (gameMode === 'solo') {
+                switch (difficultyLevel) {
+                    case 'easy': return 4;
+                    case 'medium': return 8;
+                    case 'hard': return 12;
+                }
+            }
+            return 8;
+        }
+
+        function adjustGridLayout(totalCards) {
+            if (totalCards <= 9) {
+                gameContainer.style.gridTemplateColumns = 'repeat(3, 100px)';
+            } else if (totalCards <= 16) {
+                gameContainer.style.gridTemplateColumns = 'repeat(4, 100px)';
+            } else {
+                gameContainer.style.gridTemplateColumns = 'repeat(5, 100px)';
+            }
+        }
+
+        function createCard(icon) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            card.dataset.icon = icon;
+            card.addEventListener('click', () => flipCard(card));
+            return card;
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function flipCard(card) {
+            if (flippedCards.length < 2 && !card.classList.contains('flipped')) {
+                card.classList.add('flipped');
+                card.innerHTML = `<i class="fas ${card.dataset.icon}"></i>`;
+                flippedCards.push(card);
+
+                if (flippedCards.length === 2) {
+                    checkMatch();
+                }
+            }
+        }
+
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.dataset.icon === card2.dataset.icon) {
+                matchedPairs++;
+                flippedCards = [];
+
+                if (gameMode === 'duo') {
+                    const currentPlayerClass = playerTurn === 1 ? 'player1' : 'player2';
+                    card1.classList.add(currentPlayerClass);
+                    card2.classList.add(currentPlayerClass);
+                    scores[`player${playerTurn}`]++;
+                }
+
+                if (matchedPairs === getIconCount()) {
+                    setTimeout(endGame, 500);
+                }
+            } else {
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card1.innerHTML = '';
+                    card2.classList.remove('flipped');
+                    card2.innerHTML = '';
+                    flippedCards = [];
+
+                    errorCount++;  // Incrementa o contador de erros
+                    errorCounter.innerText = `Erros: ${errorCount}`;  // Atualiza o contador na tela
+
+                    if (gameMode === 'duo') {
+                        playerTurn = playerTurn === 1 ? 2 : 1;
+                    }
+                }, 1000);
+            }
+        }
+
+        function endGame() {
+            let message = gameMode === 'solo'
+                ? `Parabéns! Você encontrou todos os pares!`
+                : `O ${scores.player1 > scores.player2 ? 'Jogador 1' : 'Jogador 2'} venceu o jogo!`;
+            alert(message);
+            resetGame();
+        }
+
+        function resetGame() {
+            gameContainer.innerHTML = '';
+            flippedCards = [];
+            matchedPairs = 0;
+            playerTurn = 1;
+            scores.player1 = 0;
+            scores.player2 = 0;
+            errorCount = 0;  // Reseta o contador de erros
+            errorCounter.innerText = `Erros: ${errorCount}`;  // Reseta o contador na tela
+            createBoard();
+        }
+
+        createBoard();
+    </script>
+</body>
+</html>
